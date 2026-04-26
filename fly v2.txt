@@ -1,0 +1,78 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local plr = Players.LocalPlayer
+
+local SPEED = 250 
+local MAX_VERTICAL_SPEED = 90 -- Augmenté à 90 pour plus de pêche en montée
+local CONSTANT_FALL = -0.15 
+local ACTIVE = false
+
+local GuiParent = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
+
+local function getCarpet() 
+    return plr.Backpack:FindFirstChild("Flying Carpet") or (plr.Character and plr.Character:FindFirstChild("Flying Carpet"))
+end
+
+if GuiParent:FindFirstChild("FinalFloatGui") then GuiParent.FinalFloatGui:Destroy() end
+
+local sg = Instance.new("ScreenGui", GuiParent)
+sg.Name = "FinalFloatGui"
+sg.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton", sg)
+btn.Name = "MainButton"
+btn.Size = UDim2.new(0, 75, 0, 75)
+btn.Position = UDim2.new(1, -110, 0.61, 0) 
+btn.BackgroundColor3 = Color3.fromRGB(110, 60, 210)
+btn.Text = "FORCE FLOAT"
+btn.TextColor3 = Color3.new(1,1,1)
+btn.Font = Enum.Font.GothamBlack
+btn.TextSize = 10
+Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+
+RunService.Heartbeat:Connect(function()
+    if not ACTIVE then return end
+    
+    local char = plr.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local carpet = getCarpet()
+
+    if hrp and hum and hum.Health > 0 then
+        if carpet and carpet.Parent ~= char then
+            hum:EquipTool(carpet)
+        end
+
+        local cam = workspace.CurrentCamera
+        local moveDir = hum.MoveDirection 
+        
+        local finalVelocity = Vector3.new(0, 0, 0)
+
+        if moveDir.Magnitude > 0 then
+            local camCF = cam.CFrame
+            local localMove = camCF:VectorToObjectSpace(moveDir)
+            local direction3D = (camCF.LookVector * -localMove.Z) + (camCF.RightVector * localMove.X)
+            
+            local rawVelocity = direction3D.Unit * SPEED
+            
+            -- Application de la nouvelle limite plus permissive
+            local clampedY = math.clamp(rawVelocity.Y, -MAX_VERTICAL_SPEED, MAX_VERTICAL_SPEED)
+            
+            finalVelocity = Vector3.new(rawVelocity.X, clampedY, rawVelocity.Z)
+        end
+
+        hrp.AssemblyLinearVelocity = Vector3.new(
+            finalVelocity.X, 
+            finalVelocity.Y + CONSTANT_FALL, 
+            finalVelocity.Z
+        )
+        
+        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end
+end)
+
+btn.MouseButton1Click:Connect(function()
+    ACTIVE = not ACTIVE
+    btn.BackgroundColor3 = ACTIVE and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(110, 60, 210)
+    btn.Text = ACTIVE and "ON" or "FORCE FLOAT"
+end)

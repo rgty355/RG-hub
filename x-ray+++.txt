@@ -1,0 +1,115 @@
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+-- --- FONCTION DE DRAG --- --
+local function MakeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = frame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- --- LOGIQUE X-RAY UNIVERSELLE --- --
+local function LaunchXray()
+    local xrayEnabled = true
+    local xrayLoopActive = false 
+    local TARGET_TRANSPARENCY = 0.9 
+    local storage = {}
+
+    local function applyXrayEffect(active)
+        local Plots = Workspace:FindFirstChild("Plots")
+        if not Plots then return end
+
+        for _, Plot in ipairs(Plots:GetChildren()) do
+            for _, obj in ipairs(Plot:GetDescendants()) do
+                if obj:IsA("BasePart") or obj:IsA("Decal") or obj:IsA("Texture") then
+                    
+                    -- Sauvegarde de l'état d'origine
+                    if storage[obj] == nil then storage[obj] = obj.Transparency end
+
+                    -- DÉTECTION UNIVERSELLE DU PERSONNAGE (BRAINROT)
+                    -- On regarde si l'objet appartient à un modèle qui contient un Humanoid
+                    local characterModel = obj:FindFirstAncestorOfClass("Model")
+                    local isCharacter = characterModel and (characterModel:FindFirstChildOfClass("Humanoid") or characterModel:FindFirstChildOfClass("AnimationController"))
+
+                    if active then
+                        -- 1. Si c'est une hitbox invisible d'origine (> 0.1), on ignore (évite les box grises)
+                        if storage[obj] > 0.1 then 
+                            -- On ne fait rien
+                        -- 2. Si c'est un personnage (n'importe quel Brainrot), on force le visible
+                        elseif isCharacter then
+                            obj.Transparency = 0
+                        -- 3. Sinon, c'est du décor opaque (murs, sols), on applique le X-Ray
+                        else
+                            obj.Transparency = TARGET_TRANSPARENCY
+                        end
+                    else
+                        -- Reset propre
+                        if storage[obj] ~= nil then obj.Transparency = storage[obj] end
+                    end
+                end
+            end
+        end
+    end
+
+    local function startXRay()
+        xrayLoopActive = true
+        task.spawn(function() 
+            while xrayEnabled and xrayLoopActive do 
+                applyXrayEffect(true) 
+                task.wait(2) 
+            end 
+        end)
+    end
+
+    -- --- INTERFACE --- --
+    if CoreGui:FindFirstChild("XrayBrainrot_Gui") then CoreGui.XrayBrainrot_Gui:Destroy() end
+    local screenGui = Instance.new("ScreenGui", CoreGui); screenGui.Name = "XrayBrainrot_Gui"
+    local mainFrame = Instance.new("Frame", screenGui)
+    mainFrame.Size = UDim2.new(0, 140, 0, 40); mainFrame.Position = UDim2.new(0.5, -70, 0.15, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); mainFrame.Active = true
+    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+    MakeDraggable(mainFrame)
+    
+    local title = Instance.new("TextLabel", mainFrame)
+    title.Size = UDim2.new(0, 60, 1, 0); title.Position = UDim2.new(0, 12, 0, 0)
+    title.BackgroundTransparency = 1; title.Text = "X-RAY +"; title.TextColor3 = Color3.new(1,1,1)
+    title.Font = Enum.Font.GothamBold; title.TextSize = 14
+    
+    local toggleFrame = Instance.new("TextButton", mainFrame)
+    toggleFrame.Size = UDim2.new(0, 50, 0, 24); toggleFrame.Position = UDim2.new(1, -62, 0.5, -12)
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(0, 210, 100); toggleFrame.Text = ""
+    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(1, 0)
+    
+    local toggleButton = Instance.new("Frame", toggleFrame)
+    toggleButton.Size = UDim2.new(0, 20, 0, 20); toggleButton.Position = UDim2.new(1, -22, 0.5, -10)
+    toggleButton.BackgroundColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(1, 0)
+    
+    toggleFrame.MouseButton1Click:Connect(function()
+        xrayEnabled = not xrayEnabled
+        if xrayEnabled then 
+            startXRay(); toggleFrame.BackgroundColor3 = Color3.fromRGB(0, 210, 100)
+            TweenService:Create(toggleButton, TweenInfo.new(0.2), {Position = UDim2.new(1, -22, 0.5, -10)}):Play()
+        else 
+            xrayLoopActive = false; applyXrayEffect(false); storage = {}
+            toggleFrame.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+            TweenService:Create(toggleButton, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
+        end
+    end)
+    startXRay()
+end
+
+LaunchXray()

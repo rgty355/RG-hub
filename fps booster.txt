@@ -1,0 +1,80 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local plr = Players.LocalPlayer
+
+local ACTIVE = true
+-- On essaie de trouver le meilleur endroit pour mettre le bouton
+local GuiParent = (typeof(gethui) == "function" and gethui()) or plr:FindFirstChildOfClass("PlayerGui") or game:GetService("CoreGui")
+
+-- 1. CRÉATION DU BOUTON (Placé en premier pour être sûr qu'il apparaisse)
+if GuiParent:FindFirstChild("FPSBoosterGui") then GuiParent.FPSBoosterGui:Destroy() end
+local sg = Instance.new("ScreenGui")
+sg.Name = "FPSBoosterGui"
+sg.ResetOnSpawn = false
+sg.Parent = GuiParent
+
+local btn = Instance.new("TextButton", sg)
+btn.Size = UDim2.new(0, 100, 0, 40)
+btn.Position = UDim2.new(0, 10, 0, 10) 
+btn.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
+btn.Text = "FPS BOOST: ON"
+btn.TextColor3 = Color3.new(1,1,1)
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 12
+btn.ZIndex = 999 -- S'assure qu'il est au-dessus de tout
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+-- 2. Fonction d'optimisation sécurisée
+local function optimizeObject(obj)
+    -- On vérifie si c'est une interface visuelle sans bloquer le script
+    if obj:IsA("GuiObject") or obj:IsA("ScreenGui") or obj:IsA("CoreGui") or obj:IsA("PlayerGui") then
+        return 
+    end
+
+    if obj:IsA("BasePart") then
+        obj.CastShadow = false
+        obj.Material = Enum.Material.Plastic
+        obj.Reflectance = 0
+    elseif obj:IsA("Decal") or obj:IsA("Texture") then
+        obj.Transparency = 1
+    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Fire") or obj:IsA("Smoke") then
+        obj.Enabled = false
+    end
+end
+
+local function applyBoost()
+    -- Visibilité de la MAP (Fog très loin)
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 999999
+    
+    -- On nettoie le Workspace
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        optimizeObject(descendant)
+    end
+    
+    -- On nettoie les effets de lumière
+    for _, effect in ipairs(Lighting:GetDescendants()) do
+        if effect:IsA("PostEffect") then effect.Enabled = false end
+    end
+end
+
+-- 3. Exécution immédiate
+task.spawn(function()
+    applyBoost()
+end)
+
+-- 4. Surveillance des nouveaux objets
+workspace.DescendantAdded:Connect(function(descendant)
+    if ACTIVE then
+        optimizeObject(descendant)
+    end
+end)
+
+-- 5. Toggle du bouton
+btn.MouseButton1Click:Connect(function()
+    ACTIVE = not ACTIVE
+    btn.Text = ACTIVE and "FPS BOOST: ON" or "FPS BOOST: OFF"
+    btn.BackgroundColor3 = ACTIVE and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(180, 50, 50)
+    if ACTIVE then applyBoost() end
+end)
